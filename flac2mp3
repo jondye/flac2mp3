@@ -1,0 +1,130 @@
+#!/bin/bash
+
+set -e
+
+RED="\033[031m"
+END="\033[0m"
+
+function transcode()
+{
+  flac --decode --stdout "$1" | lame -b 320 -h - "$2"
+
+  declare -A tag_map=(
+    [albumartist]=TPE2    [date]=TDRC        [originaldate]=TDOR
+    [composer]=TCOM       [lyricist]=TEXT    [conductor]=TPE3
+    [remixer]=TPE4        [grouping]=TIT1    [subtitle]=TIT3
+    [discsubtitle]=TSST   [compilation]=TCMP [genre]=TCON
+    [mood]=TMOO           [isrc]=TSRC        [copyright]=TCOP
+    [media]=TMED          [label]=TPUB       [encodeby]=TENC
+    [albumsort]=TSOA      [artistsort]=TSOP  [titlesort]=TSOT
+    [language]=TLAN)
+
+  declare -A text_map=(
+    [catalognumber]=CATALOGNUMBER
+    [barcode]=BARCODE
+    [musicbrainz_albumid]="MusicBrainz Album Id"
+    [musicbrainz_artistid]="MusicBrainz Artist Id"
+    [musicbrainz_albumartistid]="MusicBrainz Album Artist Id"
+    [musicbrainz_trmid]="MusicBrainz TRM Id"
+    [musicbrainz_discid]="MusicBrainz Disc Id"
+    [musicip_puid]="MusicIP PUID"
+    [releasestatus]="MusicBrainz Album Status"
+    [releasetype]="MusicBrainz Album Type"
+    [releasecountry]="MusicBrainz Album Release Country"
+    [asin]=ASIN
+    [script]=SCRIPT
+    [musicbrainz_releasegroupid]="MusicBrainz Release Group Id"
+    [musicbrainz_workid]="MusicBrainz Work Id"
+    [albumartistsort]=ALBUMARTISTSORT)
+
+  declare -a discnumber
+
+  tmp_dir=$(mktemp -d)
+  trap "rm -r ${tmp_dir}" EXIT
+  tags=${tmp_dir}/tags
+
+
+  # Export tags
+
+  metaflac --no-utf8-convert --export-tags-to="${tags}" "$1"
+
+  # Parse and create tag arguments
+
+  args=()
+  old_ifs=$IFS
+  IFS="="
+  while read tag value
+  do
+    tag=$(echo ${tag}|tr A-Z a-z)
+    if [ ${tag_map[$tag]+exists} ]; then
+      args+=("--set-text-frame=${tag_map[$tag]}:${value}")
+    elif [ ${text_map[$tag]+exists} ]; then
+      args+=("--set-user-text-frame=${text_map[$tag]}:${value}")
+    else
+      case ${tag} in
+        album|title|artist|bpm)
+          args+=("--${tag}=${value}")
+          ;;
+        tracknumber)
+          args+=("--track=${value}")
+          ;;
+        tracktotal|totaltracks)
+          args+=("--track-total=${value}")
+          ;;
+        discnumber)
+          discnumber[0]=${value}
+          [ ${discnumber[1]+exists} ] && args+=("--set-text-frame=TPOS:${discnumber[0]}/${discnumber[1]}")
+          ;;
+        disctotal|totaldiscs)
+          discnumber[1]=${value}
+          [ ${discnumber[0]+exists} ] && args+=("--set-text-frame=TPOS:${discnumber[0]}/${discnumber[1]}")
+          ;;
+        musicbrainz_trackid)
+          args+=("--unique-file-id=http://musicbrainz.org:${value}")
+          ;;
+        *)
+          echo -e "${RED}Unknown tag ${tag}=${value}${END}"
+          ;;
+      esac
+    fi
+  done < "${tags}"
+  IFS=$old_ifs
+
+
+  # Copy image tags
+
+  declare -a picture_types=(
+    OTHER ICON OTHER_ICON FRONT_COVER BACK_COVER LEAFLET MEDIA LEAD_ARTIST
+    ARTIST CONDUCTOR BAND COMPOSER LYRICIST RECORDING_LOCATION
+    DURATION_RECORDING DURING_PERFORMANCE VIDEO BRIGHT_COLORED_FISH
+    ILLUSTRATION BAND_LOGO PUBLISHER_LOG)
+
+  picture_tags=${tmp_dir}/picture_tags
+  picture_info=${tmp_dir}/picture_info
+
+  metaflac --list --block-type=PICTURE "$1" > ${picture_tags}
+  awk '
+    /METADATA/ {block=substr($3,2);row=NR}
+    /^  type:/ {if (NR > row+1) type=$2}
+    /MIME type:/ {mimetype=$3}
+    /description:/ {$1=""; print block, type, mimetype, $0}' < ${picture_tags} > ${picture_info}
+
+  while read block image_type mimetype
+  do
+    image=$(mktemp --tmpdir=${tmp_dir} --suffix=.${mimetype#image/})
+    metaflac --block-number=$block --export-picture-to="${image}" "$1"
+    args+=(--add-image=${image}:${picture_types[$image_type]})
+  done < "${picture_info}"
+
+
+  # Write all tags
+
+  eyeD3 --v2 --to-v2.4 --no-color --artist="Dummy Artist" "$2" > /dev/null
+  eyeD3 --v2 --set-encoding=utf8 "${args[@]}" "$2"
+
+  rm -r ${tmp_dir}
+  trap - EXIT
+}
+
+transcode "$1" "$2"
+
