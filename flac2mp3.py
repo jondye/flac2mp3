@@ -4,6 +4,9 @@ from subprocess import Popen, PIPE, CalledProcessError
 import sys
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, APIC, RVA2, TALB, TBPM, TCMP, TCOM, TCON, TCOP, TDOR, TDRC, TENC, TEXT, TIPL, TIT1, TIT2, TIT3, TLAN, TMCL, TMED, TMOO, TPE1, TPE2, TPE3, TPE4, TPOS, TPUB, TRCK, TSOA, TSOP, TSOT, TSRC, TSST, TXXX, UFID
+import os
+import os.path
+import shutil
 
 def transcode(flac_filename, mp3_filename, bitrate=320):
     decoder_cmd = ['flac', '--decode', '--stdout', '--silent', flac_filename]
@@ -115,11 +118,51 @@ def tag(flac_filename, mp3_filename):
 
     id3.save(mp3_filename)
 
+def is_cover_art(f):
+    return f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.png') or f.endswith('.bmp')
+
+def is_flac(f):
+    return f.endswith('.flac')
+
+def copy_pictures(pictures, dst_folder):
+    for picture in pictures:
+        print "copy", picture, dst_folder
+        shutil.copy2(picture, dst_folder)
+
+def transcode_pair(flac_file, src_root, dst_root):
+    src = os.path.join(src_root, flac_file)
+    base = os.path.splitext(flac_file)[0]
+    dst = os.path.join(dst_root, base + '.mp3')
+    return (src, dst)
+
+def transcode_dir(flac_dir, mp3_dir):
+    for flac_root, dirs, files in os.walk(flac_dir):
+        sub_dir = os.path.relpath(flac_root, flac_dir)
+        mp3_root = os.path.normpath(os.path.join(mp3_dir, sub_dir))
+
+        if not os.path.exists(mp3_root):
+            os.mkdir(mp3_root)
+        shutil.copystat(flac_root, mp3_root)
+
+        pictures = [os.path.join(flac_root, f) for f in files if is_cover_art(f)]
+        copy_pictures(pictures, mp3_root)
+
+        flac_files = [f for f in files if is_flac(f)]
+        transcode_pairs = [transcode_pair(f, flac_root, mp3_root) for f in flac_files]
+        for flac_file, mp3_file in transcode_pairs:
+            print "transcode", flac_file, mp3_file
+            transcode(flac_file, mp3_file)
+            print "tag", mp3_file
+            tag(flac_file, mp3_file)
+
 def main():
-    flac_filename = sys.argv[1]
-    mp3_filename = sys.argv[2]
-    transcode(flac_filename, mp3_filename)
-    tag(flac_filename, mp3_filename)
+    if os.path.isdir(sys.argv[1]):
+        transcode_dir(sys.argv[1], sys.argv[2])
+    else:
+        flac_filename = sys.argv[1]
+        mp3_filename = sys.argv[2]
+        transcode(flac_filename, mp3_filename)
+        tag(flac_filename, mp3_filename)
 
 if __name__ == '__main__':
     main()
