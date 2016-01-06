@@ -3,17 +3,21 @@
 from subprocess import Popen, PIPE, CalledProcessError
 import sys
 from mutagen.flac import FLAC
-from mutagen.id3 import ID3, APIC, RVA2, TALB, TBPM, TCMP, TCOM, TCON, TCOP, TDOR, TDRC, TENC, TEXT, TIPL, TIT1, TIT2, TIT3, TLAN, TMCL, TMED, TMOO, TPE1, TPE2, TPE3, TPE4, TPOS, TPUB, TRCK, TSOA, TSOP, TSOT, TSRC, TSST, TXXX, UFID
+from mutagen.id3 import (
+    ID3, APIC, RVA2, TALB, TBPM, TCMP, TCOM, TCON, TCOP, TDOR, TDRC, TENC,
+    TEXT, TIPL, TIT1, TIT2, TIT3, TLAN, TMCL, TMED, TMOO, TPE1, TPE2, TPE3,
+    TPE4, TPOS, TPUB, TRCK, TSOA, TSOP, TSOT, TSRC, TSST, TXXX, UFID)
 import os
 import os.path
 import shutil
 
+
 def transcode(flac_filename, mp3_filename, bitrate=320):
     decoder_cmd = ['flac', '--decode', '--stdout', '--silent', flac_filename]
-    encoder_cmd = ['lame', '-b', str(bitrate), '-h', '--silent', '-', mp3_filename]
+    encoder_cmd = ['lame', '-h', '--silent', '-', mp3_filename]
     decoder = Popen(decoder_cmd, stdout=PIPE)
     encoder = Popen(encoder_cmd, stdin=decoder.stdout, stdout=PIPE)
-    decoder.stdout.close() # allow decoder to receive SIGPIPE if encoder exits
+    decoder.stdout.close()  # allow decoder to receive SIGPIPE if encoder exits
     encoder.communicate()
     decoder.wait()
     if encoder.returncode != 0:
@@ -22,58 +26,61 @@ def transcode(flac_filename, mp3_filename, bitrate=320):
         raise CalledProcessError(decoder.returncode, ' '.join(decoder_cmd))
 
 tag_map = {
-    "album"        : TALB,
-    "bpm"          : TBPM,
-    "compilation"  : TCMP,
-    "composer"     : TCOM,
-    "genre"        : TCON,
-    "copyright"    : TCOP,
-    "originaldate" : TDOR,
-    "date"         : TDRC,
-    "encodeby"     : TENC,
-    "lyricist"     : TEXT,
-    "grouping"     : TIT1,
-    "title"        : TIT2,
-    "subtitle"     : TIT3,
-    "language"     : TLAN,
-    "media"        : TMED,
-    "mood"         : TMOO,
-    "artist"       : TPE1,
-    "albumartist"  : TPE2,
-    "conductor"    : TPE3,
-    "remixer"      : TPE4,
-    "label"        : TPUB,
-    "albumsort"    : TSOA,
-    "artistsort"   : TSOP,
-    "titlesort"    : TSOT,
-    "isrc"         : TSRC,
-    "discsubtitle" : TSST,
-    }
+    "album":         TALB,
+    "bpm":           TBPM,
+    "compilation":   TCMP,
+    "composer":      TCOM,
+    "genre":         TCON,
+    "copyright":     TCOP,
+    "originaldate":  TDOR,
+    "date":          TDRC,
+    "encodeby":      TENC,
+    "lyricist":      TEXT,
+    "grouping":      TIT1,
+    "title":         TIT2,
+    "subtitle":      TIT3,
+    "language":      TLAN,
+    "media":         TMED,
+    "mood":          TMOO,
+    "artist":        TPE1,
+    "albumartist":   TPE2,
+    "conductor":     TPE3,
+    "remixer":       TPE4,
+    "label":         TPUB,
+    "albumsort":     TSOA,
+    "artistsort":    TSOP,
+    "titlesort":     TSOT,
+    "isrc":          TSRC,
+    "discsubtitle":  TSST,
+}
 
 text_tag_map = {
-    "catalognumber"              : u'CATALOGNUMBER',
-    "barcode"                    : u'BARCODE',
-    "musicbrainz_albumid"        : u"MusicBrainz Album Id",
-    "musicbrainz_artistid"       : u"MusicBrainz Artist Id",
-    "musicbrainz_albumartistid"  : u"MusicBrainz Album Artist Id",
-    "musicbrainz_trmid"          : u"MusicBrainz TRM Id",
-    "musicbrainz_discid"         : u"MusicBrainz Disc Id",
-    "musicip_puid"               : u"MusicIP PUID",
-    "releasestatus"              : u"MusicBrainz Album Status",
-    "releasetype"                : u"MusicBrainz Album Type",
-    "releasecountry"             : u"MusicBrainz Album Release Country",
-    "asin"                       : u'ASIN',
-    "script"                     : u'SCRIPT',
-    "musicbrainz_releasegroupid" : u"MusicBrainz Release Group Id",
-    "musicbrainz_workid"         : u"MusicBrainz Work Id",
-    "albumartistsort"            : u'ALBUMARTISTSORT',
-    }
+    "acoustid_id":                 u'Acoustid Id',
+    "albumartistsort":             u'ALBUMARTISTSORT',
+    "asin":                        u'ASIN',
+    "barcode":                     u'BARCODE',
+    "catalognumber":               u'CATALOGNUMBER',
+    "musicbrainz_albumartistid":   u"MusicBrainz Album Artist Id",
+    "musicbrainz_albumid":         u"MusicBrainz Album Id",
+    "musicbrainz_artistid":        u"MusicBrainz Artist Id",
+    "musicbrainz_discid":          u"MusicBrainz Disc Id",
+    "musicbrainz_releasegroupid":  u"MusicBrainz Release Group Id",
+    "musicbrainz_trmid":           u"MusicBrainz TRM Id",
+    "musicbrainz_workid":          u"MusicBrainz Work Id",
+    "musicip_puid":                u"MusicIP PUID",
+    "releasecountry":              u"MusicBrainz Album Release Country",
+    "releasestatus":               u"MusicBrainz Album Status",
+    "releasetype":                 u"MusicBrainz Album Type",
+    "script":                      u'SCRIPT',
+}
+
 
 def total(flac, total_tags):
     for tag in total_tags:
         if tag in flac:
             return u'/' + flac[tag][0]
     return u''
+
 
 def replaygain(flac, id3, gain_type):
     gain_tag = 'replaygain_%s_gain' % gain_type
@@ -83,8 +90,10 @@ def replaygain(flac, id3, gain_type):
         peak = float(flac[peak_tag][0][:-3])
         id3.add(RVA2(unicode(gain_type), 1, gain, peak))
 
+
 def performers(people):
     return [x.rstrip(u')').rsplit(u' (', 1) for x in people]
+
 
 def tag(flac_filename, mp3_filename):
     flac = FLAC(flac_filename)
@@ -106,34 +115,51 @@ def tag(flac_filename, mp3_filename):
             id3.add(TIPL(encoding=3, people=[u'producer', value]))
         elif tag == 'performer':
             id3.add(TMCL(encoding=3, people=performers(value)))
-        elif tag not in ['tracktotal', 'totaltracks', 'disctotal', 'totaldiscs', 'replaygain_album_gain', 'replaygain_album_peak', 'replaygain_track_gain', 'replaygain_track_peak']:
+        elif tag not in [
+                'tracktotal', 'totaltracks', 'disctotal', 'totaldiscs',
+                'replaygain_album_gain', 'replaygain_album_peak',
+                'replaygain_track_gain', 'replaygain_track_peak']:
             print "Unknown tag %s=%s" % (tag, value)
 
     replaygain(flac, id3, 'album')
     replaygain(flac, id3, 'track')
 
     for pic in flac.pictures:
-        tag = APIC(encoding=3, mime=pic.mime, type=pic.type, desc=pic.desc, data=pic.data)
+        tag = APIC(
+            encoding=3,
+            mime=pic.mime,
+            type=pic.type,
+            desc=pic.desc,
+            data=pic.data)
         id3.add(tag)
 
     id3.save(mp3_filename)
 
+
 def is_cover_art(f):
-    return f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.png') or f.endswith('.bmp')
+    return (
+        f.endswith('.jpg')
+        or f.endswith('.jpeg')
+        or f.endswith('.png')
+        or f.endswith('.bmp'))
+
 
 def is_flac(f):
     return f.endswith('.flac')
+
 
 def copy_pictures(pictures, dst_folder):
     for picture in pictures:
         print "copy", picture, dst_folder
         shutil.copy2(picture, dst_folder)
 
+
 def transcode_pair(flac_file, src_root, dst_root):
     src = os.path.join(src_root, flac_file)
     base = os.path.splitext(flac_file)[0]
     dst = os.path.join(dst_root, base + '.mp3')
     return (src, dst)
+
 
 def transcode_dir(flac_dir, mp3_dir):
     for flac_root, dirs, files in os.walk(flac_dir):
@@ -155,6 +181,7 @@ def transcode_dir(flac_dir, mp3_dir):
             print "tag", mp3_file
             tag(flac_file, mp3_file)
 
+
 def main():
     if os.path.isdir(sys.argv[1]):
         transcode_dir(sys.argv[1], sys.argv[2])
@@ -166,6 +193,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
