@@ -8,12 +8,27 @@ from mutagen.id3 import (
     TEXT, TIPL, TIT1, TIT2, TIT3, TLAN, TMCL, TMED, TMOO, TPE1, TPE2, TPE3,
     TPE4, TPOS, TPUB, TRCK, TSOA, TSOP, TSOT, TSRC, TSST, TXXX, UFID)
 import os
-import os.path
 import shutil
+import tempfile
+from contextlib import contextmanager
 
 
 class UnknownTag(RuntimeError):
     pass
+
+
+def newer(f1, f2):
+    return (not os.path.exists(f2) or
+            int(os.path.getmtime(f1)) > int(os.path.getmtime(f2)))
+
+
+@contextmanager
+def mk_tmp_dir():
+    name = tempfile.mkdtemp()
+    try:
+        yield name
+    finally:
+        shutil.rmtree(name)
 
 
 def transcode(flac_filename, mp3_filename, bitrate=320):
@@ -158,43 +173,45 @@ def copy_pictures(src_root, files, dst_folder):
         shutil.copy2(picture, dst_folder)
 
 
-def transcode_pair(flac_file, src_root, dst_root):
-    src = os.path.join(src_root, flac_file)
-    base = os.path.splitext(flac_file)[0]
-    dst = os.path.join(dst_root, base + '.mp3')
-    return (src, dst)
-
-
 def transcode_dir(flac_dir, mp3_dir):
-    for flac_root, dirs, files in os.walk(flac_dir):
-        sub_dir = os.path.relpath(flac_root, flac_dir)
-        mp3_root = os.path.normpath(os.path.join(mp3_dir, sub_dir))
+    with mk_tmp_dir() as tmp_dir:
+        for flac_root, dirs, files in os.walk(flac_dir):
+            sub_dir = os.path.relpath(flac_root, flac_dir)
+            mp3_root = os.path.normpath(os.path.join(mp3_dir, sub_dir))
+            tmp_root = os.path.normpath(os.path.join(tmp_dir, sub_dir))
 
-        if not os.path.exists(mp3_root):
-            os.mkdir(mp3_root)
-        shutil.copystat(flac_root, mp3_root)
+            if not os.path.exists(mp3_root):
+                os.mkdir(mp3_root)
+            shutil.copystat(flac_root, mp3_root)
+            if not os.path.exists(tmp_root):
+                os.mkdir(tmp_root)
 
-        copy_pictures(flac_root, files, mp3_root)
+            copy_pictures(flac_root, files, mp3_root)
 
-        flac_files = [f for f in files if is_flac(f)]
-        transcode_pairs = [transcode_pair(f, flac_root, mp3_root) for f in flac_files]
-        tagger = Tagger()
-        for flac_file, mp3_file in transcode_pairs:
-            print("[transcode] %s" % (os.path.relpath(flac_file, flac_dir)))
-            transcode(flac_file, mp3_file)
-            print("[tag      ] %s" % (os.path.relpath(mp3_file, mp3_dir)))
-            tagger.tag(flac_file, mp3_file)
+            tagger = Tagger()
+            for flac_file_name in files:
+                if not is_flac(flac_file_name):
+                    continue
+
+                mp3_file_name = os.path.splitext(flac_file_name)[0] + '.mp3'
+                flac = os.path.join(flac_root, flac_file_name)
+                tmp = os.path.join(tmp_root, mp3_file_name)
+                mp3 = os.path.join(mp3_root, mp3_file_name)
+
+                if newer(flac, mp3):
+                    print("[transcode] %s" % (os.path.join(sub_dir, flac_file_name)))
+                    transcode(flac, tmp)
+                    print("[tag      ] %s" % (os.path.join(sub_dir, mp3_file_name)))
+                    tagger.tag(flac, tmp)
+                    shutil.move(tmp, mp3)
+                    shutil.copystat(flac, mp3)
+                else:
+                    print("[skip     ] %s" % (os.path.join(sub_dir, flac_file_name)))
 
 
 def main():
     if os.path.isdir(sys.argv[1]):
         transcode_dir(sys.argv[1], sys.argv[2])
-    else:
-        flac_filename = sys.argv[1]
-        mp3_filename = sys.argv[2]
-        transcode(flac_filename, mp3_filename)
-        tagger = Tagger()
-        tagger.tag(flac_filename, mp3_filename)
 
 if __name__ == '__main__':
     main()
