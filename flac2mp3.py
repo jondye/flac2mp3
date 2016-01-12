@@ -98,6 +98,7 @@ class Tagger(object):
     def tag(self, flac_filename, mp3_filename):
         flac = FLAC(flac_filename)
         id3 = ID3()
+        involved_people = []
         for tag, value in flac.iteritems():
             if tag in self.tag_map:
                 id3.add(self.tag_map[tag](encoding=3, text=value))
@@ -110,16 +111,23 @@ class Tagger(object):
                 value[0] += self._total(flac, ['disctotal', 'totaldiscs'])
                 id3.add(TPOS(encoding=3, text=value))
             elif tag == 'musicbrainz_trackid':
-                id3.add(UFID(u'http://musicbrainz.org', flac['musicbrainz_trackid']))
-            elif tag == 'producer':
-                id3.add(TIPL(encoding=3, people=[u'producer', value]))
+                id3.add(UFID(u'http://musicbrainz.org', value[0]))
+            elif tag in ('producer', 'engineer', 'arranger'):
+                involved_people.extend((unicode(tag), v) for v in value)
+            elif tag == 'mixer':
+                involved_people.extend((u'mix', v) for v in value)
             elif tag == 'performer':
-                id3.add(TMCL(encoding=3, people=self._performers(value)))
+                    id3.add(TMCL(encoding=3, people=self._performers(value)))
             elif tag not in [
                     'tracktotal', 'totaltracks', 'disctotal', 'totaldiscs',
                     'replaygain_album_gain', 'replaygain_album_peak',
-                    'replaygain_track_gain', 'replaygain_track_peak']:
+                    'replaygain_track_gain', 'replaygain_track_peak',
+                    # Don't know what to do with reference loudness - ignore it
+                    'replaygain_reference_loudness']:
                 raise UnknownTag("%s=%s" % (tag, value))
+
+        if involved_people:
+            id3.add(TIPL(encoding=3, people=involved_people))
 
         self._replaygain(flac, id3, 'album')
         self._replaygain(flac, id3, 'track')
@@ -149,8 +157,14 @@ class Tagger(object):
             peak = float(flac[peak_tag][0][:-3])
             id3.add(RVA2(unicode(gain_type), 1, gain, peak))
 
-    def _performers(self, people):
-        return [x.rstrip(u')').rsplit(u' (', 1) for x in people]
+    def _performers(self, pairs):
+        def performer_pair(performer):
+            if performer.endswith(')'):
+                artist, instrument = performer[:-1].rsplit(u' (', 1)
+            else:
+                artist, instrument = performer, u''
+            return instrument, artist
+        return [performer_pair(p) for p in pairs]
 
 
 def is_flac(f):
