@@ -123,7 +123,9 @@ class Tagger(object):
                     'replaygain_album_gain', 'replaygain_album_peak',
                     'replaygain_track_gain', 'replaygain_track_peak',
                     # Don't know what to do with reference loudness - ignore it
-                    'replaygain_reference_loudness']:
+                    'replaygain_reference_loudness',
+                    # Drop CDDB disc id
+                    'discid']:
                 raise UnknownTag("%s=%s" % (tag, value))
 
         if involved_people:
@@ -189,6 +191,7 @@ def copy_pictures(src_root, files, dst_folder):
 
 def transcode_dir(flac_dir, mp3_dir):
     with mk_tmp_dir() as tmp_dir:
+        tagger = Tagger()
         for flac_root, dirs, files in os.walk(flac_dir):
             sub_dir = os.path.relpath(flac_root, flac_dir)
             mp3_root = os.path.normpath(os.path.join(mp3_dir, sub_dir))
@@ -202,7 +205,6 @@ def transcode_dir(flac_dir, mp3_dir):
 
             copy_pictures(flac_root, files, mp3_root)
 
-            tagger = Tagger()
             for flac_file_name in files:
                 if not is_flac(flac_file_name):
                     continue
