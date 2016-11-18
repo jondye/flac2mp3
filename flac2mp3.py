@@ -64,6 +64,7 @@ class Tagger(object):
         "media":         TMED,
         "mood":          TMOO,
         "artist":        TPE1,
+        "artists":       TPE1,
         "albumartist":   TPE2,
         "conductor":     TPE3,
         "remixer":       TPE4,
@@ -86,6 +87,7 @@ class Tagger(object):
         "musicbrainz_artistid":        u"MusicBrainz Artist Id",
         "musicbrainz_discid":          u"MusicBrainz Disc Id",
         "musicbrainz_releasegroupid":  u"MusicBrainz Release Group Id",
+        "musicbrainz_releasetrackid":  u"MusicBrainz Release Track Id",
         "musicbrainz_trmid":           u"MusicBrainz TRM Id",
         "musicbrainz_workid":          u"MusicBrainz Work Id",
         "musicip_puid":                u"MusicIP PUID",
@@ -124,6 +126,8 @@ class Tagger(object):
                     'replaygain_track_gain', 'replaygain_track_peak',
                     # Don't know what to do with reference loudness - ignore it
                     'replaygain_reference_loudness',
+                    # No mapping for mp3 - https://picard.musicbrainz.org/docs/mappings/
+                    'originalyear',
                     # Drop CDDB disc id
                     'discid']:
                 raise UnknownTag("%s=%s" % (tag, value))
