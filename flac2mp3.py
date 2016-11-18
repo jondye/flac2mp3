@@ -177,20 +177,20 @@ def is_flac(f):
     return f.endswith('.flac')
 
 
-def copy_pictures(src_root, files, dst_folder):
-    def is_cover_art(f):
+def copy_extra_files(src_root, files, dst_folder):
+    def should_copy(f):
         return (
             f.endswith('.jpg')
             or f.endswith('.jpeg')
             or f.endswith('.png')
-            or f.endswith('.bmp'))
+            or f.endswith('.bmp')
+            or f.endswith('.cue'))
 
-    pictures = [os.path.join(src_root, f) for f in files if is_cover_art(f)]
+    files_to_copy = [os.path.join(src_root, f) for f in files if should_copy(f)]
 
-    for picture in pictures:
-        print(
-            "[copy     ] %s => %s" % (os.path.basename(picture), dst_folder))
-        shutil.copy2(picture, dst_folder)
+    for filename in files_to_copy:
+        print("[copy     ] %s => %s" % (os.path.basename(filename), dst_folder))
+        shutil.copy2(filename, dst_folder)
 
 
 def transcode_dir(flac_dir, mp3_dir):
@@ -207,7 +207,7 @@ def transcode_dir(flac_dir, mp3_dir):
             if not os.path.exists(tmp_root):
                 os.mkdir(tmp_root)
 
-            copy_pictures(flac_root, files, mp3_root)
+            copy_extra_files(flac_root, files, mp3_root)
 
             for flac_file_name in files:
                 if not is_flac(flac_file_name):
