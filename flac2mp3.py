@@ -6,7 +6,7 @@ from mutagen.flac import FLAC
 from mutagen.id3 import (
     ID3, APIC, RVA2, TALB, TBPM, TCMP, TCOM, TCON, TCOP, TDOR, TDRC, TENC,
     TEXT, TIPL, TIT1, TIT2, TIT3, TLAN, TMCL, TMED, TMOO, TPE1, TPE2, TPE3,
-    TPE4, TPOS, TPUB, TRCK, TSOA, TSOP, TSOT, TSRC, TSST, TXXX, UFID)
+    TPE4, TPOS, TPUB, TRCK, TSOA, TSOC, TSOP, TSOT, TSRC, TSST, TXXX, UFID)
 import os
 import shutil
 import tempfile
@@ -70,6 +70,7 @@ class Tagger(object):
         "remixer":       TPE4,
         "label":         TPUB,
         "albumsort":     TSOA,
+        "composersort":  TSOC,
         "artistsort":    TSOP,
         "titlesort":     TSOT,
         "isrc":          TSRC,
